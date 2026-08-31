@@ -29,7 +29,8 @@ import yaml
 ROOT = Path(__file__).parent.resolve()
 SITE = ROOT / "site"
 WORK = ROOT / ".work"
-MANIFEST = SITE / ".manifest.json"
+# Build state, deliberately outside SITE so it is never published.
+MANIFEST = ROOT / ".build-manifest.json"
 TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 
 
@@ -112,8 +113,25 @@ def fetch(product, source_root):
     return dest
 
 
-def has_docs(repo_dir):
-    return (repo_dir / "docs" / "mkdocs.yml").exists()
+def has_docs(repo_dir, ref=None):
+    """Whether docs/mkdocs.yml exists, at a ref or in the working tree.
+
+    Early tags of a product can predate its docs/ directory entirely, and a repo
+    can be listed here before it has any docs at all. Neither is an error, but
+    both have to be found before a build is attempted rather than as a stack
+    trace from inside one.
+    """
+    if ref is None:
+        return (repo_dir / "docs" / "mkdocs.yml").exists()
+    return subprocess.run(
+        ["git", "-C", str(repo_dir), "cat-file", "-e", f"{ref}:docs/mkdocs.yml"],
+        capture_output=True,
+    ).returncode == 0
+
+
+def built(state, tag):
+    """Legacy manifests stored True; current ones store a status string."""
+    return state.get(tag) in (True, "built")
 
 
 def warn_stale_version_provider(repo_dir, name):
@@ -124,7 +142,10 @@ def warn_stale_version_provider(repo_dir, name):
     that is a 404 on every page load, and it arms the "outdated version" banner.
     Fix it by deleting extra.version from the product's own mkdocs.yml.
     """
-    text = (repo_dir / "docs" / "mkdocs.yml").read_text(encoding="utf-8", errors="ignore")
+    config = repo_dir / "docs" / "mkdocs.yml"
+    if not config.exists():
+        return
+    text = config.read_text(encoding="utf-8", errors="ignore")
     if re.search(r"provider:\s*mike", text):
         print(f"    WARNING: {name} is latest-only but declares extra.version.provider;"
               " remove it from its mkdocs.yml")
@@ -222,6 +243,9 @@ def build_dev(product, repo_dir, dest, base, args, state, failures):
         repo_dir = repo_dir or fetch(product, args.source_root)
         run(["git", "-C", str(repo_dir), "checkout", "--quiet", "--force",
              "--detach", default_branch(repo_dir)])
+        if not has_docs(repo_dir):
+            print("    skipped dev (no docs/mkdocs.yml on the default branch)")
+            return
         build(repo_dir, dest / "dev", f"{base}/dev/", args.mkdocs)
         noindex(dest / "dev")
         state["__dev__"] = remote_head(product, args.source_root)
@@ -244,21 +268,33 @@ def do_product(product, args, manifest, mkdocs, failures):
     head = remote_head(product, args.source_root) if want_dev else None
 
     if product["versions"] == "latest":
-        newest = tags[-1]
-        print(f"  {name}: latest = {newest}")
-        fresh = state.get("latest") == newest and dest.exists()
+        # Compared against the newest tag on the remote, not the one finally built,
+        # so a newest tag that carries no docs does not force a clone every night.
+        seen = tags[-1]
+        fresh = state.get("seen") == seen and dest.exists()
         dev_fresh = not want_dev or (state.get("__dev__") == head and (dest / "dev").exists())
         if fresh and dev_fresh and not args.force:
+            print(f"  {name}: latest = {state.get('latest')}")
             print("    up to date, skipping")
             return
+
         repo_dir = fetch(product, args.source_root)
-        if not fresh or args.force:
+        with_docs = [t for t in tags if has_docs(repo_dir, t)]
+        if not with_docs:
+            raise RuntimeError("no release tag contains docs/mkdocs.yml")
+        newest = with_docs[-1]
+        print(f"  {name}: latest = {newest}")
+        if newest != seen:
+            print(f"    note: {seen} has no docs/mkdocs.yml, using {newest}")
+
+        if state.get("latest") != newest or not dest.exists() or args.force:
             run(["git", "-C", str(repo_dir), "checkout", "--quiet", "--force", newest])
             warn_stale_version_provider(repo_dir, name)
             # Rebuilding the product root removes anything nested under it, dev included.
             build(repo_dir, dest, f"{base}/", mkdocs)
             state["latest"] = newest
             state.pop("__dev__", None)
+        state["seen"] = seen
         if want_dev:
             build_dev(product, repo_dir, dest, base, args, state, failures)
         return
@@ -270,8 +306,9 @@ def do_product(product, args, manifest, mkdocs, failures):
     newest = wanted[-1]
     print(f"  {name}: {len(wanted)} version(s), latest = {newest}")
 
-    todo = [t for t in wanted if not (state.get(t) and (dest / t).exists())]
-    need_latest = state.get("__latest__") != newest or not (dest / "latest").exists()
+    todo = [t for t in wanted
+            if state.get(t) != "nodocs" and not (built(state, t) and (dest / t).exists())]
+    need_latest = state.get("__latest_seen__") != newest or not (dest / "latest").exists()
     need_dev = want_dev and (state.get("__dev__") != head or not (dest / "dev").exists())
     if not todo and not need_latest and not need_dev and not args.force:
         print("    up to date, skipping")
@@ -279,16 +316,19 @@ def do_product(product, args, manifest, mkdocs, failures):
 
     repo_dir = fetch(product, args.source_root)
     for tag in wanted:
-        if state.get(tag) and (dest / tag).exists() and not args.force:
+        if state.get(tag) == "nodocs" and not args.force:
+            continue
+        if built(state, tag) and (dest / tag).exists() and not args.force:
+            continue
+        if not has_docs(repo_dir, tag):
+            state[tag] = "nodocs"
+            print(f"    skipped {tag} (no docs/mkdocs.yml at this tag)")
             continue
         try:
             run(["git", "-C", str(repo_dir), "checkout", "--quiet", "--force", tag])
-            if not has_docs(repo_dir):
-                print(f"    skipped {tag} (predates docs/)")
-                continue
             build(repo_dir, dest / tag, f"{base}/{tag}/", mkdocs)
             noindex(dest / tag)
-            state[tag] = True
+            state[tag] = "built"
             print(f"    built {tag}")
         except Exception as e:
             failures.append(f"{name} {tag}: {detail(e)}")
@@ -296,12 +336,17 @@ def do_product(product, args, manifest, mkdocs, failures):
 
     # The newest tag is built a second time as /latest/ rather than copied, so its
     # canonical points at itself. A copy would canonicalize to a noindex page.
-    if need_latest or args.force:
+    alias = next((t for t in reversed(wanted) if has_docs(repo_dir, t)), None)
+    if alias is None:
+        failures.append(f"{name}: no tag at or above {product.get('min_version')} has docs")
+        alias = newest
+    elif need_latest or args.force:
         try:
-            run(["git", "-C", str(repo_dir), "checkout", "--quiet", "--force", newest])
+            run(["git", "-C", str(repo_dir), "checkout", "--quiet", "--force", alias])
             build(repo_dir, dest / "latest", f"{base}/latest/", mkdocs)
-            state["__latest__"] = newest
-            print(f"    built latest ({newest})")
+            state["__latest__"] = alias
+            state["__latest_seen__"] = newest
+            print(f"    built latest ({alias})")
         except Exception as e:
             failures.append(f"{name} latest: {detail(e)}")
 
@@ -310,7 +355,7 @@ def do_product(product, args, manifest, mkdocs, failures):
 
     published = [t for t in reversed(wanted) if (dest / t).exists()]
     if published:
-        write_versions_json(dest, published, newest)
+        write_versions_json(dest, published, alias)
     write_redirect(dest / "index.html", "latest/", f"{base}/latest/")
 
 

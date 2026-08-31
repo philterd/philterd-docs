@@ -108,31 +108,33 @@ it can be added here.
 
 ## How a build gets triggered
 
-Three ways, all of which end in the same pull-based build:
+- **Nightly cron.** A release published during the day is live the next morning, with
+  no wiring in any product repo.
+- **Push to `main` here.** Changes to the build script, the product list, the landing
+  page, or the shared header rebuild and redeploy.
+- **`workflow_dispatch`.** To pick up a release without waiting for the nightly run.
 
-- **Nightly cron**, the safety net. A release published during the day is live the
-  next morning with no per-repo wiring at all.
-- **`workflow_dispatch`**, to pick up a release immediately by hand.
-- **`repository_dispatch`** of type `product-released`, fired by a product repo when
-  it tags a release. `examples/notify-docs.yml` is the product-repo side.
+Most runs do nothing. Tags and branch tips are checked with `git ls-remote` before
+anything is cloned, so a night with no new releases and no new commits finishes in
+under a second and republishes an identical site.
 
-The dispatch route is worth the wiring because it makes docs publish with the release
-rather than up to a day later. What it deliberately does not do is let a product repo
-push content. The payload names the repo and tag, and the build ignores both: it
-still resolves tags itself and pulls from the sources in `products.yaml`. So a token
-compromised in any product repo can trigger a rebuild of the correct content and
-nothing else.
+Two things to know about the schedule. GitHub disables scheduled workflows in a
+repository after 60 days without commits, so if this repo goes quiet, confirm the
+nightly is still enabled. And Actions cron is best-effort, sometimes delayed by up to
+an hour.
 
-The alternative, having each repo build its own docs and push them into this repo,
-needs a content-write credential in every product repo. Any one of them being
-compromised means arbitrary pages published on `docs.philterd.ai`. It also splits the
-build across fourteen environments, so the shared header and the `noindex` policy
-would have to be applied correctly in all of them rather than in one place.
+## Why the build pulls rather than each repo pushing
 
-The one real argument for the push model is fidelity: docs pushed at release time
-were built with the dependencies current at that release, whereas this rebuilds
-Philter 2.7.0's docs with today's mkdocs-material. If an old tag ever stops building,
-pin the versions in `requirements.txt` rather than moving to push.
+Having each product repo build its docs and push them here would need a
+content-write credential in every product repo, and any one of them being compromised
+means arbitrary pages published on `docs.philterd.ai`. It would also split the build
+across fourteen environments, so the shared header and the `noindex` policy would have
+to be applied correctly in all of them rather than in one place.
+
+The one real argument for the push model is fidelity: docs pushed at release time were
+built with the dependencies current at that release, whereas this rebuilds Philter
+2.7.0's docs with today's mkdocs-material. If an old tag ever stops building, pin the
+versions in `requirements.txt` rather than moving to push.
 
 ## Adding a product
 
