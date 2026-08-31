@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Philterd Documentation</title>
+<meta name="description" content="Documentation for the Philterd open source PII and PHI redaction toolkit.">
+<link rel="canonical" href="https://docs.philterd.ai/">
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1b1b1f; --muted: #5c5f66;
+    --line: #e3e4e8; --accent: #c62828; --card: #fafafb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16171a; --fg: #e8e9ec; --muted: #9ea2aa;
+            --line: #2c2e33; --accent: #ef5350; --card: #1d1f23; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 4rem 1.5rem 5rem; }
+  header { border-bottom: 1px solid var(--line); padding-bottom: 2rem; margin-bottom: 2.5rem; }
+  h1 { font-size: 1.9rem; margin: 0 0 .5rem; letter-spacing: -.01em; }
+  .lede { color: var(--muted); margin: 0; }
+  h2 { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em;
+       color: var(--muted); margin: 2.5rem 0 1rem; }
+  .card { display: block; border: 1px solid var(--line); border-radius: 8px;
+          background: var(--card); padding: 1.1rem 1.25rem; margin-bottom: .75rem;
+          text-decoration: none; color: inherit; }
+  .card:hover { border-color: var(--accent); }
+  .card h3 { margin: 0 0 .25rem; font-size: 1.05rem; color: var(--accent); }
+  .card p { margin: 0; color: var(--muted); font-size: .92rem; }
+  footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--line);
+           color: var(--muted); font-size: .85rem; }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Philterd Documentation</h1>
+    <p class="lede">Open source PII and PHI redaction that runs inside your own infrastructure.</p>
+  </header>
+
+  <h2>Products</h2>
+
+  <a class="card" href="/philter/latest/">
+    <h3>Philter</h3>
+    <p>Self-hosted PII and PHI redaction API. Start here if you want a service to call.</p>
+  </a>
+
+  <a class="card" href="/phileas/">
+    <h3>Phileas</h3>
+    <p>The redaction library underneath Philter, for Java, Python, and .NET.
+       Start here if you want redaction inside your own process.</p>
+  </a>
+
+  <footer>
+    Documentation for the rest of the toolkit is still published per repository on
+    <a href="https://github.com/philterd">GitHub</a>.
+    Product overviews and guides live at <a href="https://philterd.ai/">philterd.ai</a>.
+  </footer>
+
+</div>
+</body>
+</html>

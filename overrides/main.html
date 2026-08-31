@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{#
+  Shared cross-product header, layered onto every product's own theme by
+  build.py via theme.custom_dir. The announcement block is a documented
+  Material extension point, so this survives theme upgrades and does not
+  require any change to a product's own mkdocs.yml.
+#}
+{% block announce %}
+<style>
+  .phd-bar { display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem 1.1rem; font-size: .72rem; }
+  .phd-bar strong { font-weight: 700; letter-spacing: .02em; }
+  .phd-bar nav { display: flex; flex-wrap: wrap; gap: .35rem 1.1rem; }
+  .phd-bar a { color: inherit; text-decoration: none; opacity: .85; }
+  .phd-bar a:hover { opacity: 1; text-decoration: underline; }
+  .phd-bar .phd-home { margin-left: auto; }
+</style>
+<div class="phd-bar">
+  <strong><a href="/">Philterd Docs</a></strong>
+  <nav>
+    <a href="/philter/latest/">Philter</a>
+    <a href="/phileas/">Phileas</a>
+  </nav>
+  <span class="phd-home"><a href="https://philterd.ai/">philterd.ai</a></span>
+</div>
+{% endblock %}

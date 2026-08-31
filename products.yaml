@@ -1,0 +1,33 @@
+# What docs.philterd.ai publishes, and how.
+#
+# versions:
+#   latest  - build only the newest release tag, served at /<path>/
+#   all     - build every release tag >= min_version, served at /<path>/<version>/,
+#             with the newest also published at /<path>/latest/
+#
+# The rule behind the split: things you deploy and run get versioned docs, because
+# a customer running an older release needs docs matching their build. Things you
+# depend on as a library get latest only, because upgrading is a coordinate bump.
+
+site_url: https://docs.philterd.ai
+
+products:
+  - name: Philter
+    repo: philter
+    path: philter
+    summary: Self-hosted PII and PHI redaction API.
+    versions: all
+    # Also publish the default branch at /philter/dev/ so docs merged to main can be
+    # reviewed on the site before a release. Always noindex.
+    dev: true
+    # Earliest tag to publish. 2.6.0 predates the docs/ directory in this repo and has
+    # nothing to build. Raise this to drop releases you no longer support;
+    # every version published here is a version people will open support requests about.
+    min_version: "2.7.0"
+
+  - name: Phileas
+    repo: phileas
+    path: phileas
+    summary: The redaction library underneath Philter. Java, Python, and .NET.
+    versions: latest
+    dev: true

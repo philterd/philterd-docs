@@ -1,0 +1,68 @@
+name: Build and deploy docs.philterd.ai
+
+on:
+  # Nightly, so a product release published during the day is live the next morning
+  # without any per-repo wiring. Dispatch manually to pick up a release immediately.
+  schedule:
+    - cron: '0 18 * * *'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+  # Fired by a product repo when it publishes a release, so docs go live with the
+  # release instead of waiting for the nightly run. The payload is not trusted and
+  # not used: the build still pulls from the tags it resolves itself, so this only
+  # decides when to build, never what gets published.
+  repository_dispatch:
+    types: [product-released]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.x'
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - uses: actions/configure-pages@v6
+
+      # Restoring the previous site/ makes the build incremental: only release tags
+      # not already published get rebuilt. A cache miss is not a failure, it just
+      # means a full rebuild of every version.
+      - name: Restore previous build
+        uses: actions/cache@v6
+        with:
+          path: site
+          key: docs-site-${{ github.run_id }}
+          restore-keys: docs-site-
+
+      - name: Build
+        run: ./build.py
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: ./site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

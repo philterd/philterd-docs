@@ -1,0 +1,34 @@
+# Add to a product repo (philter, phileas, ...) as .github/workflows/notify-docs.yml.
+#
+# It publishes nothing. It tells philterd-docs that a release exists, and that build
+# pulls the tag itself. The token therefore needs no write access to any content
+# anywhere: a fine-grained PAT scoped to philterd/philterd-docs with only
+# "Contents: read" and "Metadata: read" can trigger a repository_dispatch.
+#
+# Compare with having each repo build and push its own docs into the docs repo. That
+# needs a content-write credential in every product repo, and any one of them being
+# compromised lets an attacker publish arbitrary pages on docs.philterd.ai. For a
+# company selling security software that is the wrong trade for a few minutes of
+# latency.
+
+name: Notify docs site of a release
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger the docs build
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_DISPATCH_TOKEN }}
+        run: |
+          gh api repos/philterd/philterd-docs/dispatches \
+            --method POST \
+            --field event_type=product-released \
+            --field client_payload[repo]="${GITHUB_REPOSITORY#philterd/}" \
+            --field client_payload[tag]="${GITHUB_REF_NAME}"

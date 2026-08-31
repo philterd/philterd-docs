@@ -1,0 +1,8 @@
+# Union of the per-product docs/requirements.txt files. These are unpinned upstream,
+# so one environment builds every product. Pin here if a build ever breaks on an
+# upstream release.
+mkdocs
+mkdocs-material
+mkdocs-markdownextradata-plugin
+mkdocs-glightbox
+PyYAML

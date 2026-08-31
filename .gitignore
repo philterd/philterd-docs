@@ -1,0 +1,18 @@
+# Build output. Assembled by build.py, published to Pages by CI, never committed.
+site/
+
+# Throwaway clones of the product repos. build.py checks out release tags in here
+# and writes a generated mkdocs.philterd.yml beside each product's own config.
+.work/
+
+# Local build environment (see README).
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Editor and OS noise
+.DS_Store
+*.swp
